@@ -1,19 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using IronPdf;
 using IronPdf.Rendering.Abstractions;
-using PawnShop.Business.DTO;
-using PawnShop.Business.Interfaces;
-using PawnShop.Business.Services;
 using PawnShop.Data.Models;
 using PawnShop.Forms.Extensions;
 using PawnShop.Forms.Validation;
+using PawnShop.Oracle.Services;
 
 namespace PawnShop.Forms.Forms.SecondaryForms
 {
@@ -21,9 +16,11 @@ namespace PawnShop.Forms.Forms.SecondaryForms
     {
         private readonly string PdfPath;
         private readonly BasePdfRenderer _renderer;
-        public ClientsAddingForm(BasePdfRenderer renderer, string pdfPath)
+        private readonly ClientService _clientService;
+        public ClientsAddingForm(ClientService clientService, BasePdfRenderer renderer, string pdfPath)
         {
             InitializeComponent();
+            _clientService = clientService;
             _renderer = renderer;
             PdfPath = pdfPath;
         }
@@ -40,29 +37,44 @@ namespace PawnShop.Forms.Forms.SecondaryForms
                 return;
             }
 
-            StringBuilder html = new StringBuilder();
-            html.Append("Table 'Clients': <br>'");
-            await using IClientPassportService service = new ClientPassportService(html);
-
-            var dto = new ClientPassportDTO
+            try
             {
-                PassportId = Guid.NewGuid(),
-                PassportNumber = textBox4.Text,
-                PassportSeries = textBox5.Text,
-                DateOfIssue = DateTime.Parse(dateTimePicker1.Text),
-                ClientId = Guid.NewGuid(),
-                FullName = textBox1.Text
-            };
+                _clientService.Html.Append("Table 'Clients': <br>'");
 
-            await service.AddAsync(dto);
-            html.Append($"Current Client Count: {service.GetCount()}<br>");
+                var names = textBox1.Text.Split(' ');
 
-            var pdf = _renderer.RenderHtmlAsPdf(html.ToString());
-            pdf.AppendPdf(PdfDocument.FromFile(PdfPath));
-            PdfExtensions.SaveOrMerge(PdfPath, pdf);
+                var client = new Client
+                {
+                    FirstName = names[0],
+                    LastName = names[1]
+                };
 
-            MessageBox.Show("Data has been added successfully!", "Adding", MessageBoxButtons.OK);
-            this.OpenChildForm(new ClientsForm(), this);
+                await _clientService.AddAsync(client);
+
+                var createdClient = await _clientService.GetByFullName(client.FullName);
+                var passport = new Passport
+                {
+                    Number = textBox4.Text,
+                    Series = textBox5.Text,
+                    DateOfIssue = dateTimePicker1.Text,
+                    ClientId = createdClient.Id
+                };
+
+                await _clientService.AddPassportAsync(passport);
+                _clientService.Html.Append($"Current Client Count: {_clientService.GetCount()}<br>");
+
+                var pdf = _renderer.RenderHtmlAsPdf(_clientService.Html.ToString());
+                pdf.AppendPdf(PdfDocument.FromFile(PdfPath));
+                PdfExtensions.SaveOrMerge(PdfPath, pdf);
+                _clientService.Html.Clear();
+
+                MessageBox.Show("Data has been added successfully!", "Adding", MessageBoxButtons.OK);
+                this.OpenChildForm(new ClientsForm(), this);
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("Client with those credentials already exists.");
+            }
         }
 
         private bool TrySendErrorMessage()
@@ -99,7 +111,7 @@ namespace PawnShop.Forms.Forms.SecondaryForms
 
         private void textBox1_Validating(object sender, CancelEventArgs e)
         {
-            if (!textBox1.Text.ContainsDigit() && textBox1.Text.Split(' ').Length >= 2)
+            if (!textBox1.Text.ContainsDigit() && textBox1.Text.Split(' ').Length == 2)
             {
                 label2.SetValid();
             }

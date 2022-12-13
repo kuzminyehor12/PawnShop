@@ -7,11 +7,10 @@ using System.Text;
 using System.Windows.Forms;
 using IronPdf;
 using IronPdf.Rendering.Abstractions;
-using PawnShop.Business.Interfaces;
-using PawnShop.Business.Services;
 using PawnShop.Data.Models;
 using PawnShop.Forms.Extensions;
 using PawnShop.Forms.Validation;
+using PawnShop.Oracle.Services;
 
 namespace PawnShop.Forms.Forms.SecondaryForms
 {
@@ -19,11 +18,13 @@ namespace PawnShop.Forms.Forms.SecondaryForms
     {
         private readonly string PdfPath;
         private readonly BasePdfRenderer _renderer;
-        public CategoriesAddingForm(BasePdfRenderer renderer, string pdfPath)
+        private readonly CategoryService _categoryService;
+        public CategoriesAddingForm(CategoryService categoryService, BasePdfRenderer renderer, string pdfPath)
         {
             InitializeComponent();
             _renderer = renderer;
             PdfPath = pdfPath;
+            _categoryService = categoryService;
         }
 
         private async void button1_Click(object sender, EventArgs e)
@@ -33,26 +34,31 @@ namespace PawnShop.Forms.Forms.SecondaryForms
                 return;
             }
 
-            StringBuilder html = new StringBuilder();
-            html.Append("Table 'Categories': <br>'");
-            await using ICategoryService service = new SQLCategoryService(html);
-
-            var category = new Categories
+            try
             {
-                CategoryId = Guid.NewGuid(),
-                Name = textBox1.Text,
-                Note = richTextBox1.Text,
-            };
+                _categoryService.Html.Append("Table 'Categories': <br>'");
 
-            await service.AddAsync(category);
-            html.Append($"Current Client Count: {service.GetCount()}<br>");
+                var category = new Category
+                {
+                    Name = textBox1.Text,
+                    Description = richTextBox1.Text,
+                };
 
-            var pdf = _renderer.RenderHtmlAsPdf(html.ToString());
-            pdf.AppendPdf(PdfDocument.FromFile(PdfPath));
-            PdfExtensions.SaveOrMerge(PdfPath, pdf);
+                await _categoryService.AddAsync(category);
+                _categoryService.Html.Append($"Current Category Count: {_categoryService.GetCount()}<br>");
 
-            MessageBox.Show("Data has been added successfully!", "Adding", MessageBoxButtons.OK);
-            this.OpenChildForm(new CategoriesForm(), this);
+                var pdf = _renderer.RenderHtmlAsPdf(_categoryService.Html.ToString());
+                pdf.AppendPdf(PdfDocument.FromFile(PdfPath));
+                PdfExtensions.SaveOrMerge(PdfPath, pdf);
+
+                MessageBox.Show("Data has been added successfully!", "Adding", MessageBoxButtons.OK);
+                _categoryService.Html.Clear();
+                this.OpenChildForm(new CategoriesForm(), this);
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("Perhaps this category exist already!");
+            }
         }
 
         private void pictureBox1_Click(object sender, EventArgs e)

@@ -29,61 +29,17 @@ namespace PawnShop.Forms.Forms
         /// </summary>
         private void InitializeComponent()
         {
+            this.button1 = new System.Windows.Forms.Button();
+            this.button2 = new System.Windows.Forms.Button();
+            this.button3 = new System.Windows.Forms.Button();
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
+            this.ClientId = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.FullName = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.PassportNumber = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.PassportSeries = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.DateOfIssue = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.button1 = new System.Windows.Forms.Button();
-            this.button2 = new System.Windows.Forms.Button();
-            this.button3 = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             this.SuspendLayout();
-            // 
-            // dataGridView1
-            // 
-            this.dataGridView1.AllowUserToAddRows = false;
-            this.dataGridView1.AllowUserToDeleteRows = false;
-            this.dataGridView1.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
-            this.dataGridView1.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.dataGridView1.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
-            this.FullName,
-            this.PassportNumber,
-            this.PassportSeries,
-            this.DateOfIssue});
-            this.dataGridView1.Location = new System.Drawing.Point(-1, 1);
-            this.dataGridView1.Name = "dataGridView1";
-            this.dataGridView1.RowHeadersWidth = 51;
-            this.dataGridView1.RowTemplate.Height = 29;
-            this.dataGridView1.Size = new System.Drawing.Size(902, 384);
-            this.dataGridView1.TabIndex = 0;
-            this.dataGridView1.CellValueChanged += new System.Windows.Forms.DataGridViewCellEventHandler(this.dataGridView1_CellValueChanged);
-            // 
-            // FullName
-            // 
-            this.FullName.HeaderText = "Full Name";
-            this.FullName.MinimumWidth = 6;
-            this.FullName.Name = "FullName";
-            // 
-            // PassportNumber
-            // 
-            this.PassportNumber.HeaderText = "Passport Number";
-            this.PassportNumber.MinimumWidth = 6;
-            this.PassportNumber.Name = "PassportNumber";
-            // 
-            // PassportSeries
-            // 
-            this.PassportSeries.FillWeight = 50F;
-            this.PassportSeries.HeaderText = "Passport Series";
-            this.PassportSeries.MinimumWidth = 6;
-            this.PassportSeries.Name = "PassportSeries";
-            // 
-            // DateOfIssue
-            // 
-            this.DateOfIssue.FillWeight = 75F;
-            this.DateOfIssue.HeaderText = "Date of Issue";
-            this.DateOfIssue.MinimumWidth = 6;
-            this.DateOfIssue.Name = "DateOfIssue";
             // 
             // button1
             // 
@@ -118,6 +74,63 @@ namespace PawnShop.Forms.Forms
             this.button3.UseVisualStyleBackColor = true;
             this.button3.Click += new System.EventHandler(this.button3_Click);
             // 
+            // dataGridView1
+            // 
+            this.dataGridView1.AllowUserToAddRows = false;
+            this.dataGridView1.AllowUserToDeleteRows = false;
+            this.dataGridView1.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
+            this.dataGridView1.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dataGridView1.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+            this.ClientId,
+            this.FullName,
+            this.PassportNumber,
+            this.PassportSeries,
+            this.DateOfIssue});
+            this.dataGridView1.Location = new System.Drawing.Point(-1, 1);
+            this.dataGridView1.Name = "dataGridView1";
+            this.dataGridView1.RowHeadersWidth = 51;
+            this.dataGridView1.RowTemplate.Height = 29;
+            this.dataGridView1.Size = new System.Drawing.Size(902, 384);
+            this.dataGridView1.TabIndex = 0;
+            this.dataGridView1.CellValueChanged += new System.Windows.Forms.DataGridViewCellEventHandler(this.dataGridView1_CellValueChanged);
+            // 
+            // ClientId
+            // 
+            this.ClientId.FillWeight = 113.6364F;
+            this.ClientId.HeaderText = "Client Id";
+            this.ClientId.MinimumWidth = 50;
+            this.ClientId.Name = "ClientId";
+            this.ClientId.ReadOnly = true;
+            // 
+            // FullName
+            // 
+            this.FullName.FillWeight = 95.8042F;
+            this.FullName.HeaderText = "Full Name";
+            this.FullName.MinimumWidth = 6;
+            this.FullName.Name = "FullName";
+            // 
+            // PassportNumber
+            // 
+            this.PassportNumber.FillWeight = 95.8042F;
+            this.PassportNumber.HeaderText = "Passport Number";
+            this.PassportNumber.MinimumWidth = 6;
+            this.PassportNumber.Name = "PassportNumber";
+            this.PassportNumber.ReadOnly = true;
+            // 
+            // PassportSeries
+            // 
+            this.PassportSeries.FillWeight = 47.9021F;
+            this.PassportSeries.HeaderText = "Passport Series";
+            this.PassportSeries.MinimumWidth = 6;
+            this.PassportSeries.Name = "PassportSeries";
+            // 
+            // DateOfIssue
+            // 
+            this.DateOfIssue.FillWeight = 71.85315F;
+            this.DateOfIssue.HeaderText = "Date of Issue";
+            this.DateOfIssue.MinimumWidth = 6;
+            this.DateOfIssue.Name = "DateOfIssue";
+            // 
             // ClientsForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
@@ -136,14 +149,14 @@ namespace PawnShop.Forms.Forms
         }
 
         #endregion
-
-        private System.Windows.Forms.DataGridView dataGridView1;
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.Button button2;
+        private System.Windows.Forms.Button button3;
+        private System.Windows.Forms.DataGridView dataGridView1;
+        private System.Windows.Forms.DataGridViewTextBoxColumn ClientId;
         private System.Windows.Forms.DataGridViewTextBoxColumn FullName;
         private System.Windows.Forms.DataGridViewTextBoxColumn PassportNumber;
         private System.Windows.Forms.DataGridViewTextBoxColumn PassportSeries;
         private System.Windows.Forms.DataGridViewTextBoxColumn DateOfIssue;
-        private System.Windows.Forms.Button button3;
     }
 }

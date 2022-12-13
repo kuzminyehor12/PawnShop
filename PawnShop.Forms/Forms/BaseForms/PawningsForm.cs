@@ -1,20 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
+using System.Configuration;
 using System.Data;
-using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using IronPdf;
 using IronPdf.Rendering.Abstractions;
-using Microsoft.EntityFrameworkCore;
-using PawnShop.Business.Interfaces;
-using PawnShop.Business.Services;
 using PawnShop.Data.Models;
 using PawnShop.Forms.Extensions;
 using PawnShop.Forms.Forms.SecondaryForms;
+using PawnShop.Oracle.Services;
 
 namespace PawnShop.Forms.Forms
 {
@@ -22,12 +18,18 @@ namespace PawnShop.Forms.Forms
     {
         private readonly PawningsAddingForm _secondaryForm;
         private readonly BasePdfRenderer _renderer;
+        private readonly PawningService _pawningService;
+        private readonly CategoryService _categoryService;
+        private readonly ClientService _clientService;
         private const string Pdfpath = "../../../../PDFs/Pawnings.pdf";
         public PawningsForm()
         {
             InitializeComponent();
             _renderer = new ChromePdfRenderer();
-            _secondaryForm = new PawningsAddingForm(_renderer, Pdfpath);
+            _pawningService = new PawningService(ConfigurationManager.ConnectionStrings["PawnShopOracleDb"].ConnectionString);
+            _clientService = new ClientService(ConfigurationManager.ConnectionStrings["PawnShopOracleDb"].ConnectionString);
+            _categoryService = new CategoryService(ConfigurationManager.ConnectionStrings["PawnShopOracleDb"].ConnectionString);
+            _secondaryForm = new PawningsAddingForm(_pawningService, _categoryService, _clientService, _renderer, Pdfpath);
         }
 
         private async void button1_Click(object sender, EventArgs e)
@@ -36,35 +38,32 @@ namespace PawnShop.Forms.Forms
             {
                 dataGridView1.Invoke(new MethodInvoker(async () =>
                 {
-                    dataGridView1.Rows.Clear();
-                    StringBuilder html = new StringBuilder();
-                    html.Append("Table 'Pawnings': <br>");
-
-                    await using IPawningService service = new PawningService(html);
-
-                    var pawnings = await service.GetAllBySelection(p => new
+                    try
                     {
-                        Description = p.Description,
-                        SubmissionDate = p.SubmissionDate,
-                        ReturnDate = p.ReturnDate,
-                        Sum = p.Sum.ToString() + " грн",
-                        Comission = p.Commision.ToString() + "%",
-                        OwnerName = p.Client.FullName,
-                        CategoryName = p.Category.Name
-                    });
+                        dataGridView1.Rows.Clear();
+                        _pawningService.Html.Append("Table 'Pawnings': <br>");
 
-                    foreach (var row in pawnings.OrderBy(p => p.ReturnDate))
-                    {
-                        dataGridView1.Rows.Add(row.Description, row.SubmissionDate,
-                            row.ReturnDate, row.Sum, row.Comission, row.OwnerName, row.CategoryName);
+                        var pawnings = await _pawningService.GetAllWithDetailsAsync();
 
-                        html.Append($"Description: {row.Description}, Submission Date: {row.SubmissionDate}, Return Date: {row.ReturnDate}," +
-                                    $"Sum: {row.Sum}, Commission: {row.Comission}, Owner Name: {row.OwnerName}, Category Name: {row.CategoryName}<br>");
+                        foreach (var row in pawnings)
+                        {
+                            dataGridView1.Rows.Add(row.Id, row.Description, row.SubmissionDate,
+                                row.ReturnDate, row.Sum, row.Commision, row.WarehouseAddress, row.OwnerName, row.CategoryName);
+
+                            _pawningService.Html.Append($"Pawning Id: {row.Id}, Description: {row.Description}, Submission Date: {row.SubmissionDate}, Return Date: {row.ReturnDate}," +
+                                        $"Sum: {row.Sum}, Commission: {row.Commision}, Warehouse Address: {row.WarehouseAddress}, " +
+                                        $"Owner Name: {row.OwnerName}, Category Name: {row.CategoryName}<br>");
+                        }
+
+                        _pawningService.Html.Append($"<br>{DateTime.Now}<br>");
+                        var pdf = _renderer.RenderHtmlAsPdf(_pawningService.Html.ToString());
+                        PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                        _pawningService.Html.Clear();
                     }
-
-                    html.Append($"<br>{DateTime.Now}<br>");
-                    var pdf = _renderer.RenderHtmlAsPdf(html.ToString());
-                    PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(ex.Message);
+                    }
                 }));
             });
         }
@@ -81,35 +80,33 @@ namespace PawnShop.Forms.Forms
             {
                 dataGridView1.Invoke(new MethodInvoker(async () =>
                 {
-                    StringBuilder html = new StringBuilder();
-                    html.Append("Table 'Pawnings': <br>");
-                    await using IPawningService service = new PawningService(html);
-
-                    if (dataGridView1.SelectedRows == null)
+                    try
                     {
-                        MessageBox.Show("There is nothing to delete.", "Delete Message", MessageBoxButtons.OK);
-                        return;
-                    }
+                        _pawningService.Html.Append("Table 'Pawnings': <br>");
 
-                    foreach (DataGridViewRow row in dataGridView1.SelectedRows)
+                        if (dataGridView1.SelectedRows == null)
+                        {
+                            MessageBox.Show("There is nothing to delete.", "Delete Message", MessageBoxButtons.OK);
+                            return;
+                        }
+
+                        foreach (DataGridViewRow row in dataGridView1.SelectedRows)
+                        {
+                            var findingPawning = await _pawningService.GetByIdAsync(Convert.ToDecimal(row.Cells["PawningId"].EditedFormattedValue));
+                            await _pawningService.DeleteAsync(findingPawning);
+                        }
+
+                        _pawningService.Html.Append($"Current Pawnings Count: {_pawningService.GetCount()}<br>");
+                        _pawningService.Html.Append($"<br>{DateTime.Now}<br>");
+                        var pdf = _renderer.RenderHtmlAsPdf(_pawningService.Html.ToString());
+                        PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                        MessageBox.Show("Data has been deleted successfully!", "Delete", MessageBoxButtons.OK);
+                        _pawningService.Html.Clear();
+                    }
+                    catch (Exception ex)
                     {
-                        var names = row.Cells["OwnerName"].EditedFormattedValue.ToString().Split(' ');
-                        var findingPawning = await service
-                            .GetOneByFIlter(p =>
-                                p.Client.Surname == names[0] 
-                                && p.Client.Name == names[1]
-                                && names.Length == 2 ? p.Client.Patronymic == null : p.Client.Patronymic == names[2]
-                                );
-
-                        await service.DeleteAsync(findingPawning);
+                        MessageBox.Show(ex.Message);
                     }
-
-                    html.Append($"Current Client Count: {service.GetCount()}<br>");
-                    html.Append($"<br>{DateTime.Now}<br>");
-                    var pdf = _renderer.RenderHtmlAsPdf(html.ToString());
-                    PdfExtensions.SaveOrMerge(Pdfpath, pdf);
-
-                    MessageBox.Show("Data has been deleted successfully!", "Delete", MessageBoxButtons.OK);
                 }));
             });
         }
@@ -125,41 +122,46 @@ namespace PawnShop.Forms.Forms
                 return;
             }
 
-            dataGridView1.Update();
-            StringBuilder html = new StringBuilder();
-            html.Append("Table 'Pawnings': <br>");
-
-            await using IPawningService service = new PawningService(html);
-
-            var findingPawning = await service
-                .GetOneByFIlter(p =>
-                    p.Description == dataRow.Cells["Description"].EditedFormattedValue.ToString());
-
-            var pawning = new Pawnings
+            try
             {
-                PawningId = findingPawning.PawningId,
-                Description = dataRow.Cells["Description"].EditedFormattedValue.ToString(),
-                SubmissionDate = DateTime.Parse(dataRow.Cells["SubmissionDate"].EditedFormattedValue.ToString()),
-                ReturnDate = DateTime.Parse(dataRow.Cells["ReturnDate"].EditedFormattedValue.ToString()),
-                Sum = double.Parse(dataRow.Cells["Sum"].EditedFormattedValue.ToString()),
-                Commision = double.Parse(dataRow.Cells["Comission"].EditedFormattedValue.ToString())
-            };
+                dataGridView1.Update();
+                _pawningService.Html.Append("Table 'Pawnings': <br>");
 
-            await service.UpdateAsync(pawning);
+                var findingPawning = await _pawningService.GetByIdAsync(Convert.ToDecimal(dataRow.Cells["PawningId"].EditedFormattedValue));
+                var pawning = new Pawning
+                {
+                    Id = findingPawning.Id,
+                    CategoryId = findingPawning.CategoryId,
+                    WarehouseId = findingPawning.WarehouseId,
+                    ClientId = findingPawning.ClientId,
+                    Description = dataRow.Cells["Description"].EditedFormattedValue.ToString(),
+                    SubmissionDate = dataRow.Cells["SubmissionDate"].EditedFormattedValue.ToString(),
+                    ReturnDate = dataRow.Cells["ReturnDate"].EditedFormattedValue.ToString(),
+                    Sum = Convert.ToDecimal(dataRow.Cells["Sum"].EditedFormattedValue),
+                    Commision = Convert.ToDecimal(dataRow.Cells["Comission"].EditedFormattedValue)
+                };
 
-            html.Append($"Current Client Count: {service.GetCount()}<br>");
-            html.Append($"<br>{DateTime.Now}<br>");
-            var pdf = _renderer.RenderHtmlAsPdf(html.ToString());
-            PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                await _pawningService.UpdateAsync(pawning);
 
-            MessageBox.Show("Data has been updated successfully!", "Update", MessageBoxButtons.OK);
+                _pawningService.Html.Append($"Current Pawnings Count: {_pawningService.GetCount()}<br>");
+                _pawningService.Html.Append($"<br>{DateTime.Now}<br>");
+                var pdf = _renderer.RenderHtmlAsPdf(_pawningService.Html.ToString());
+                PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                MessageBox.Show("Data has been updated successfully!", "Update", MessageBoxButtons.OK);
+                _pawningService.Html.Clear();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
 
         private bool IsUpdateInvalid(DataGridViewRow dataRow)
         {
-            return dataRow.Cells[0].EditedFormattedValue.ToString() == string.Empty
-                   || DateTime.Parse(dataRow.Cells["SubmissionDate"].EditedFormattedValue.ToString()) > DateTime.Parse(
-                       dataRow.Cells["ReturnDate"].EditedFormattedValue.ToString())
+            return dataRow.Cells[1].EditedFormattedValue.ToString() == string.Empty
+                   || !DateTime.TryParse(dataRow.Cells["SubmissionDate"].EditedFormattedValue.ToString(), out var submissionDate)
+                   || !DateTime.TryParse(dataRow.Cells["ReturnDate"].EditedFormattedValue.ToString(), out var returnDate)
+                   || submissionDate > returnDate
                    || !double.TryParse(dataRow.Cells["Sum"].EditedFormattedValue.ToString(), out double sum)
                    || sum < 0
                    || !double.TryParse(dataRow.Cells["Comission"].EditedFormattedValue.ToString(), out double com)

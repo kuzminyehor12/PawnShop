@@ -1,33 +1,29 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
+using System.Configuration;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using IronPdf;
 using IronPdf.Rendering.Abstractions;
-using Microsoft.EntityFrameworkCore;
-using PawnShop.Business.Interfaces;
-using PawnShop.Business.Services;
 using PawnShop.Data.Models;
 using PawnShop.Forms.Extensions;
 using PawnShop.Forms.Forms.SecondaryForms;
+using PawnShop.Oracle.Services;
 
 namespace PawnShop.Forms.Forms
 {
     public partial class CategoriesForm : Form
     {
         private readonly CategoriesAddingForm _secondaryForm;
+        private readonly CategoryService _categoryService;
         private readonly BasePdfRenderer _renderer;
         private const string Pdfpath = "../../../../PDFs/Categories.pdf";
         public CategoriesForm()
         {
             InitializeComponent();
             _renderer = new ChromePdfRenderer();
-            _secondaryForm = new CategoriesAddingForm(_renderer, Pdfpath);
+            _categoryService = new CategoryService(ConfigurationManager.ConnectionStrings["PawnShopOracleDb"].ConnectionString);
+            _secondaryForm = new CategoriesAddingForm(_categoryService, _renderer, Pdfpath);
         }
 
         private async void button1_Click(object sender, EventArgs e)
@@ -36,22 +32,28 @@ namespace PawnShop.Forms.Forms
             {
                 dataGridView1.Invoke(new MethodInvoker(async () =>
                 {
-                    dataGridView1.Rows.Clear();
-                    StringBuilder html = new StringBuilder();
-                    html.Append("Table 'Categories': <br>");
-
-                    await using ICategoryService service = new SQLCategoryService(html);
-                    var categories = await service.GetAllAsync();
-
-                    foreach (var row in categories.OrderBy(c => c.Name))
+                    try
                     {
-                        dataGridView1.Rows.Add(row.Name, row.Note);
-                        html.Append($"Category Name: {row.Name}, Category Note: {row.Note}<br>");
-                    }
+                        dataGridView1.Rows.Clear();
+                        _categoryService.Html.Append("Table 'Categories': <br>");
 
-                    html.Append($"<br>{DateTime.Now}<br>");
-                    var pdf = _renderer.RenderHtmlAsPdf(html.ToString());
-                    PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                        var categories = await _categoryService.GetAllAsync();
+
+                        foreach (var row in categories)
+                        {
+                            dataGridView1.Rows.Add(row.Id, row.Name, row.Description);
+                            _categoryService.Html.Append($"Category Id: {row.Id}, Category Name: {row.Name}, Category Description: {row.Description}<br>");
+                        }
+
+                        _categoryService.Html.Append($"<br>{DateTime.Now}<br>");
+                        var pdf = _renderer.RenderHtmlAsPdf(_categoryService.Html.ToString());
+                        PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                        _categoryService.Html.Clear();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(ex.Message);
+                    }
                 }));
             });
         }
@@ -74,26 +76,27 @@ namespace PawnShop.Forms.Forms
                         return;
                     }
 
-                    StringBuilder html = new StringBuilder();
-                    html.Append("Table 'Categories': <br>");
-
-                    await using ICategoryService service = new SQLCategoryService(html);
-
-                    foreach (DataGridViewRow row in dataGridView1.SelectedRows)
+                    try
                     {
-                        var findingCategory = await service
-                            .GetOneByFIlter(p => 
-                                p.Name == row.Cells["CategoryName"].EditedFormattedValue.ToString());
+                        _categoryService.Html.Append("Table 'Categories': <br>");
 
-                        await service.DeleteAsync(findingCategory);
+                        foreach (DataGridViewRow row in dataGridView1.SelectedRows)
+                        {
+                            var findingCategory = await _categoryService.GetByIdAsync(Convert.ToDecimal(row.Cells["CategoryId"].EditedFormattedValue));
+                            await _categoryService.DeleteAsync(findingCategory);
+                        }
+
+                        _categoryService.Html.Append($"Current Category Count: {_categoryService.GetCount()}<br>");
+                        _categoryService.Html.Append($"<br>{DateTime.Now}<br>");
+                        var pdf = _renderer.RenderHtmlAsPdf(_categoryService.Html.ToString());
+                        PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                        MessageBox.Show("Data has been deleted successfully!", "Delete", MessageBoxButtons.OK);
+                        _categoryService.Html.Clear();
                     }
-
-                    html.Append($"Current Client Count: {service.GetCount()}<br>");
-                    html.Append($"<br>{DateTime.Now}<br>");
-                    var pdf = _renderer.RenderHtmlAsPdf(html.ToString());
-                    PdfExtensions.SaveOrMerge(Pdfpath, pdf);
-
-                    MessageBox.Show("Data has been deleted successfully!", "Delete", MessageBoxButtons.OK);
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(ex.Message);
+                    }
                 }));
             });
         }
@@ -109,30 +112,32 @@ namespace PawnShop.Forms.Forms
                 return;
             }
 
-            dataGridView1.Update();
-            StringBuilder html = new StringBuilder();
-            html.Append("Table 'Categories': <br>");
-
-            await using ICategoryService service = new SQLCategoryService(html);
-
-            var findingCategory = await service
-                .GetOneByFIlter(p =>
-                    p.Name == dataRow.Cells["CategoryName"].EditedFormattedValue.ToString());
-
-            var category = new Categories
+            try
             {
-                CategoryId = findingCategory.CategoryId,
-                Name = dataRow.Cells["CategoryName"].EditedFormattedValue.ToString(),
-                Note = dataRow.Cells["CategoryNote"].EditedFormattedValue.ToString(),
-            };
+                dataGridView1.Update();
+                _categoryService.Html.Append("Table 'Categories': <br>");
 
-            await service.UpdateAsync(category);
-            html.Append($"Current Client Count: {service.GetCount()}<br>");
-            html.Append($"<br>{DateTime.Now}<br>");
-            var pdf = _renderer.RenderHtmlAsPdf(html.ToString());
-            PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                var findingCategory = await _categoryService.GetByIdAsync(Convert.ToDecimal(dataRow.Cells["CategoryId"].EditedFormattedValue));
 
-            MessageBox.Show("Data has been updated successfully!", "Update", MessageBoxButtons.OK);
+                var category = new Category
+                {
+                    Id = findingCategory.Id,
+                    Name = dataRow.Cells["CategoryName"].EditedFormattedValue.ToString(),
+                    Description = dataRow.Cells["CategoryNote"].EditedFormattedValue.ToString(),
+                };
+
+                await _categoryService.UpdateAsync(category);
+                _categoryService.Html.Append($"Current Category Count: {_categoryService.GetCount()}<br>");
+                _categoryService.Html.Append($"<br>{DateTime.Now}<br>");
+                var pdf = _renderer.RenderHtmlAsPdf(_categoryService.Html.ToString());
+                PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                MessageBox.Show("Data has been updated successfully!", "Update", MessageBoxButtons.OK);
+                _categoryService.Html.Clear();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
 
         private bool IsUpdateValid(DataGridViewRow dataRow)

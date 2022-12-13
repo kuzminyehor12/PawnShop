@@ -34,6 +34,7 @@ namespace PawnShop.Forms.Forms.BaseForms
             this.CategoryName = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.MaxPrice = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.MinPrice = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.AveragePrice = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.Count = new System.Windows.Forms.DataGridViewTextBoxColumn();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             this.SuspendLayout();
@@ -48,12 +49,13 @@ namespace PawnShop.Forms.Forms.BaseForms
             this.CategoryName,
             this.MaxPrice,
             this.MinPrice,
+            this.AveragePrice,
             this.Count});
-            this.dataGridView1.Location = new System.Drawing.Point(0, 0);
+            this.dataGridView1.Location = new System.Drawing.Point(2, 0);
             this.dataGridView1.Name = "dataGridView1";
             this.dataGridView1.RowHeadersWidth = 51;
             this.dataGridView1.RowTemplate.Height = 29;
-            this.dataGridView1.Size = new System.Drawing.Size(946, 394);
+            this.dataGridView1.Size = new System.Drawing.Size(947, 394);
             this.dataGridView1.TabIndex = 0;
             // 
             // button2
@@ -69,31 +71,48 @@ namespace PawnShop.Forms.Forms.BaseForms
             // 
             // CategoryName
             // 
+            this.CategoryName.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
             this.CategoryName.HeaderText = "Category Name";
             this.CategoryName.MinimumWidth = 6;
             this.CategoryName.Name = "CategoryName";
             this.CategoryName.ReadOnly = true;
+            this.CategoryName.Width = 223;
             // 
             // MaxPrice
             // 
+            this.MaxPrice.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
             this.MaxPrice.HeaderText = "Max Price";
             this.MaxPrice.MinimumWidth = 6;
             this.MaxPrice.Name = "MaxPrice";
             this.MaxPrice.ReadOnly = true;
+            this.MaxPrice.Width = 224;
             // 
             // MinPrice
             // 
+            this.MinPrice.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
             this.MinPrice.HeaderText = "Min Price";
             this.MinPrice.MinimumWidth = 6;
             this.MinPrice.Name = "MinPrice";
             this.MinPrice.ReadOnly = true;
+            this.MinPrice.Width = 223;
+            // 
+            // AveragePrice
+            // 
+            this.AveragePrice.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
+            this.AveragePrice.HeaderText = "Average Price";
+            this.AveragePrice.MinimumWidth = 6;
+            this.AveragePrice.Name = "AveragePrice";
+            this.AveragePrice.ReadOnly = true;
+            this.AveragePrice.Width = 125;
             // 
             // Count
             // 
+            this.Count.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
             this.Count.HeaderText = "Count";
             this.Count.MinimumWidth = 6;
             this.Count.Name = "Count";
             this.Count.ReadOnly = true;
+            this.Count.Width = 223;
             // 
             // AnalyticsForm
             // 
@@ -117,6 +136,7 @@ namespace PawnShop.Forms.Forms.BaseForms
         private System.Windows.Forms.DataGridViewTextBoxColumn CategoryName;
         private System.Windows.Forms.DataGridViewTextBoxColumn MaxPrice;
         private System.Windows.Forms.DataGridViewTextBoxColumn MinPrice;
+        private System.Windows.Forms.DataGridViewTextBoxColumn AveragePrice;
         private System.Windows.Forms.DataGridViewTextBoxColumn Count;
     }
 }

@@ -9,12 +9,10 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using IronPdf;
 using IronPdf.Rendering.Abstractions;
-using Microsoft.EntityFrameworkCore;
-using PawnShop.Business.Interfaces;
-using PawnShop.Business.Services;
 using PawnShop.Data.Models;
 using PawnShop.Forms.Extensions;
 using PawnShop.Forms.Validation;
+using PawnShop.Oracle.Services;
 
 namespace PawnShop.Forms.Forms.SecondaryForms
 {
@@ -22,11 +20,22 @@ namespace PawnShop.Forms.Forms.SecondaryForms
     {
         private readonly string PdfPath;
         private readonly BasePdfRenderer _renderer;
-        public PawningsAddingForm(BasePdfRenderer renderer, string pdfPath)
+        private readonly PawningService _pawningService;
+        private readonly CategoryService _categoryService;
+        private readonly ClientService _clientService;
+        public PawningsAddingForm(
+            PawningService pawningService,
+            CategoryService categoryService,
+            ClientService clientService,
+            BasePdfRenderer renderer, 
+            string pdfPath)
         {
             InitializeComponent();
             _renderer = renderer;
             PdfPath = pdfPath;
+            _pawningService = pawningService;
+            _categoryService = categoryService;
+            _clientService = clientService;
         }
 
         private void pictureBox1_Click(object sender, EventArgs e)
@@ -48,46 +57,39 @@ namespace PawnShop.Forms.Forms.SecondaryForms
                 return;
             }
 
-            StringBuilder html = new StringBuilder();
-            html.Append("Table 'Pawnings': <br>'");
+            _pawningService.Html.Append("Table 'Pawnings': <br>'");
 
-            await using IPawningService pawningService = new PawningService(html);
-            await using ICategoryService categoryService = new SQLCategoryService(html);
-            await using IClientPassportService clientService = new ClientPassportService(html);
-
-            var names = listBox1.Items[listBox1.SelectedIndex].ToString().Split(' ');
-
-            var category = await categoryService
-                .GetOneByFIlter(c =>
-                    c.Name == listBox2.Items[listBox2.SelectedIndex].ToString());
-
-            var client = await clientService
-                .GetClient(c =>
-                    c.Surname == names[0] 
-                    && c.Name == names[1] 
-                    && names.Length == 3 ? c.Patronymic == names[2] : c.Patronymic == null);
-
-            var pawning = new Pawnings
+            try
             {
-                PawningId = Guid.NewGuid(),
-                Description = richTextBox1.Text,
-                SubmissionDate = DateTime.Parse(dateTimePicker1.Text),
-                ReturnDate = DateTime.Parse(dateTimePicker2.Text),
-                Sum = double.Parse(textBox1.Text),
-                Commision = double.Parse(textBox2.Text),
-                ClientId = client.ClientId,
-                CategoryId = category.CategoryId
-            };
+                var category = await _categoryService.GetByNameAsync(listBox2.Items[listBox2.SelectedIndex].ToString());
+                var client = await _clientService.GetByFullName(listBox1.Items[listBox1.SelectedIndex].ToString());
 
-            await pawningService.AddAsync(pawning);
-            html.Append($"Current Client Count: {pawningService.GetCount()}<br>");
+                var pawning = new Pawning
+                {
+                    Description = richTextBox1.Text,
+                    SubmissionDate = dateTimePicker1.Text,
+                    ReturnDate = dateTimePicker2.Text,
+                    Sum = decimal.Parse(textBox1.Text),
+                    Commision = decimal.Parse(textBox2.Text),
+                    ClientId = client.Id,
+                    CategoryId = category.Id
+                };
 
-            var pdf = _renderer.RenderHtmlAsPdf(html.ToString());
-            pdf.AppendPdf(PdfDocument.FromFile(PdfPath));
-            PdfExtensions.SaveOrMerge(PdfPath, pdf);
+                await _pawningService.AddAsync(pawning);
+                _pawningService.Html.Append($"Current Pawning Count: {_pawningService.GetCount()}<br>");
 
-            MessageBox.Show("Data has been added successfully!", "Adding", MessageBoxButtons.OK);
-            this.OpenChildForm(new PawningsForm(), this);
+                var pdf = _renderer.RenderHtmlAsPdf(_pawningService.Html.ToString());
+                pdf.AppendPdf(PdfDocument.FromFile(PdfPath));
+                PdfExtensions.SaveOrMerge(PdfPath, pdf);
+                _pawningService.Html.Clear();
+
+                MessageBox.Show("Data has been added successfully!", "Adding", MessageBoxButtons.OK);
+                this.OpenChildForm(new PawningsForm(), this);
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("Perhaps this pawning exist already!");
+            }
         }
 
         private bool TrySendErrorMessage()
@@ -136,12 +138,9 @@ namespace PawnShop.Forms.Forms.SecondaryForms
                 listBox1.Invoke(new MethodInvoker(async () =>
                 {
                     StringBuilder html = new StringBuilder();
-                    await using IClientPassportService service = new ClientPassportService(html);
-                    var clientNames = await service.GetAllAsync();
+                    var clientNames = await _clientService.GetAllAsync();
 
-                    foreach (var name in clientNames
-                                 .Select(c => c.FullName)
-                                 .OrderBy(n => n))
+                    foreach (var name in clientNames.Select(c => c.FullName))
                     {
                         listBox1.Items.Add(name);
                     }
@@ -155,12 +154,9 @@ namespace PawnShop.Forms.Forms.SecondaryForms
             {
                 listBox2.Invoke(new MethodInvoker(async () =>
                 {
-                    await using ICategoryService service = new CategoryService();
-                    var categoryNames = await service.GetAllAsync();
+                    var categoryNames = await _categoryService.GetAllAsync();
 
-                    foreach (var name in categoryNames
-                                 .Select(c => c.Name)
-                                 .OrderBy(n => n))
+                    foreach (var name in categoryNames.Select(c => c.Name))
                     {
                         listBox2.Items.Add(name);
                     }

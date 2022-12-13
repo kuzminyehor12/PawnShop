@@ -1,38 +1,30 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Data.SqlClient;
-using System.Drawing;
-using System.IO;
-using System.Linq;
+using System.Configuration;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using IronPdf;
 using IronPdf.Rendering.Abstractions;
-using Microsoft.EntityFrameworkCore;
-using PawnShop.Business.DTO;
-using PawnShop.Business.Interfaces;
-using PawnShop.Business.Services;
 using PawnShop.Data.Models;
 using PawnShop.Forms.Extensions;
 using PawnShop.Forms.Forms.SecondaryForms;
+using PawnShop.Oracle.Services;
 
 namespace PawnShop.Forms.Forms
 {
     public partial class ClientsForm : Form
     {
         private readonly ClientsAddingForm _secondaryForm;
+        private readonly ClientService _clientService;
         private readonly BasePdfRenderer _renderer;
         private const string Pdfpath = "../../../../PDFs/Clients.pdf";
         public ClientsForm()
         {
             InitializeComponent();
             _renderer = new ChromePdfRenderer();
-            _secondaryForm = new ClientsAddingForm(_renderer, Pdfpath);
+            _clientService = new ClientService(ConfigurationManager.ConnectionStrings["PawnShopOracleDb"].ConnectionString);
+            _secondaryForm = new ClientsAddingForm(_clientService, _renderer, Pdfpath);
         }
 
         private async void button1_Click(object sender, EventArgs e)
@@ -41,24 +33,28 @@ namespace PawnShop.Forms.Forms
             {
                 dataGridView1.Invoke(new MethodInvoker(async () =>
                 {
-                    dataGridView1.Rows.Clear();
-                    using PawnShopDbContext context = new PawnShopDbContext();
-
-                    StringBuilder html = new StringBuilder();
-                    html.Append("Table 'Clients': <br>");
-                    await using IClientPassportService service = new ClientPassportService(html);
-                    var clients = await service.GetAllAsync();
-
-                    foreach (var row in clients.OrderBy(e => e.FullName))
+                    try
                     {
-                        dataGridView1.Rows.Add(row.FullName, row.PassportNumber, row.PassportSeries, row.DateOfIssue);
-                        html.Append(
-                            $"Full Name: {row.FullName}, Passport Number: {row.PassportNumber}, Passport Series: {row.PassportSeries}, Date of Issue: {row.DateOfIssue}<br>");
-                    }
+                        dataGridView1.Rows.Clear();
+                        _clientService.Html.Append("Table 'Clients': <br>");
+                        var clients = await _clientService.GetAllWithPassportAsync();
 
-                    html.Append($"<br>{DateTime.Now}<br>");
-                    var pdf = _renderer.RenderHtmlAsPdf(html.ToString());
-                    PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                        foreach (var row in clients)
+                        {
+                            dataGridView1.Rows.Add(row.Id, row.FullName, row.Number, row.Series, row.DateOfIssue);
+                            _clientService.Html.Append(
+                               $"Client Id: {row.Id}, Full Name: {row.FullName}, Passport Number: {row.Number}, Passport Series: {row.Series}, Date of Issue: {row.DateOfIssue}<br>");
+                        }
+
+                        _clientService.Html.Append($"<br>{DateTime.Now}<br>");
+                        var pdf = _renderer.RenderHtmlAsPdf(_clientService.Html.ToString());
+                        PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                        _clientService.Html.Clear();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(ex.Message);
+                    }
                 }));
             });
         }
@@ -80,39 +76,46 @@ namespace PawnShop.Forms.Forms
                 return;
             }
 
-            StringBuilder html = new StringBuilder();
-            html.Append("Table 'Clients': <br>'");
+            _clientService.Html.Append("Table 'Clients': <br>'");
 
             dataGridView1.Update();
-            await using IClientPassportService service = new ClientPassportService(html);
 
-            var findingPassport = await service
-                .GetPassport((p) => 
-                    p.Number == dataRow.Cells["PassportNumber"].EditedFormattedValue.ToString());
-
-            var findingClient = await service
-                .GetClient(c => 
-                    c.PassportData == findingPassport);
-
-            var dto = new ClientPassportDTO
+            try
             {
-                PassportId = findingPassport.PassportIdataId,
-                PassportNumber = dataRow.Cells["PassportNumber"].EditedFormattedValue.ToString(),
-                PassportSeries = dataRow.Cells["PassportSeries"].EditedFormattedValue.ToString(),
-                DateOfIssue = DateTime.Parse(dataRow.Cells["DateOfIssue"].EditedFormattedValue
-                    .ToString()),
-                ClientId = findingClient.ClientId,
-                FullName = findingClient.FullName
-            };
+                var findingPassport = await _clientService.GetByPassportNumber(dataRow.Cells["PassportNumber"].EditedFormattedValue.ToString());
+                var findingClient = await _clientService.GetByIdAsync(Convert.ToDecimal(dataRow.Cells["ClientId"].EditedFormattedValue));
+                var names = dataRow.Cells["FullName"].ToString().Split(' ');
 
-            await service.UpdateAsync(dto);
-            html.Append($"Current Client Count: {service.GetCount()}<br>");
-            html.Append($"<br>{DateTime.Now}<br>");
+                var client = new Client
+                {
+                    Id = findingClient.Id,
+                    FirstName = names[0],
+                    LastName = names[1]
+                };
 
-            var pdf = _renderer.RenderHtmlAsPdf(html.ToString());
-            PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                var passport = new Passport
+                {
+                    Id = findingPassport.Id,
+                    ClientId = findingPassport.ClientId,
+                    Number = dataRow.Cells["PassportNumber"].EditedFormattedValue.ToString(),
+                    Series = dataRow.Cells["PassportSeries"].EditedFormattedValue.ToString(),
+                    DateOfIssue = dataRow.Cells["DateOfIssue"].EditedFormattedValue.ToString()
+                };
 
-            MessageBox.Show("Data has been updated successfully!", "Update", MessageBoxButtons.OK);
+                await _clientService.UpdateAsync(findingClient);
+                await _clientService.UpdatePassportAsync(findingPassport);
+                _clientService.Html.Append($"Current Client Count: {_clientService.GetCount()}<br>");
+                _clientService.Html.Append($"<br>{DateTime.Now}<br>");
+
+                var pdf = _renderer.RenderHtmlAsPdf(_clientService.Html.ToString());
+                PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                MessageBox.Show("Data has been updated successfully!", "Update", MessageBoxButtons.OK);
+                _clientService.Html.Clear();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
 
         private bool IsUpdateValid(DataGridViewRow dataRow)
@@ -121,7 +124,8 @@ namespace PawnShop.Forms.Forms
                    && Regex.IsMatch(dataRow.Cells["PassportSeries"].EditedFormattedValue.ToString(),
                        "^[\\p{IsCyrillic}]{2}$")
                    && !dataRow.Cells["FullName"].EditedFormattedValue.ToString().ContainsDigit()
-                   && dataRow.Cells["FullName"].EditedFormattedValue.ToString().Split(' ').Length >= 2;
+                   && dataRow.Cells["FullName"].EditedFormattedValue.ToString().Split(' ').Length == 2
+                   && DateTime.TryParse(dataRow.Cells["DateOfIssue"].EditedFormattedValue.ToString(), out var dateOfIssue);
         }
 
         private async void button3_Click(object sender, EventArgs e)
@@ -130,32 +134,34 @@ namespace PawnShop.Forms.Forms
             {
                 dataGridView1.Invoke(new MethodInvoker(async () =>
                 {
-                    StringBuilder html = new StringBuilder();
-                    html.Append("Table 'Clients': <br>'");
-                    await using IClientPassportService service = new ClientPassportService(html);
-
-                    if (dataGridView1.SelectedRows == null)
+                    try
                     {
-                        MessageBox.Show("There is nothing to delete.", "Delete Message", MessageBoxButtons.OK);
-                        return;
-                    }
+                        _clientService.Html.Append("Table 'Clients': <br>'");
 
-                    foreach (DataGridViewRow row in dataGridView1.SelectedRows)
+                        if (dataGridView1.SelectedRows == null)
+                        {
+                            MessageBox.Show("There is nothing to delete.", "Delete Message", MessageBoxButtons.OK);
+                            return;
+                        }
+
+                        foreach (DataGridViewRow row in dataGridView1.SelectedRows)
+                        {
+                            var findingClient = await _clientService.GetByIdAsync(Convert.ToDecimal(row.Cells["ClientId"].EditedFormattedValue));
+                            await _clientService.DeleteAsync(findingClient);
+                        }
+
+                        _clientService.Html.Append($"Current Client Count: {_clientService.GetCount()}<br>");
+                        _clientService.Html.Append($"<br>{DateTime.Now}<br>");
+
+                        var pdf = _renderer.RenderHtmlAsPdf(_clientService.Html.ToString());
+                        PdfExtensions.SaveOrMerge(Pdfpath, pdf);
+                        MessageBox.Show("Data has been deleted successfully!", "Delete", MessageBoxButtons.OK);
+                        _clientService.Html.Clear();
+                    }
+                    catch (Exception ex)
                     {
-                        var findingClient = await service
-                            .GetClient(c => 
-                                c.PassportData.Number == row.Cells["PassportNumber"].EditedFormattedValue.ToString());
-
-                        await service.DeleteAsync(findingClient);
+                        MessageBox.Show(ex.Message);
                     }
-
-                    html.Append($"Current Client Count: {service.GetCount()}<br>");
-                    html.Append($"<br>{DateTime.Now}<br>");
-
-                    var pdf = _renderer.RenderHtmlAsPdf(html.ToString());
-                    PdfExtensions.SaveOrMerge(Pdfpath, pdf);
-
-                    MessageBox.Show("Data has been deleted successfully!", "Delete", MessageBoxButtons.OK);
                 }));
             });
         }
