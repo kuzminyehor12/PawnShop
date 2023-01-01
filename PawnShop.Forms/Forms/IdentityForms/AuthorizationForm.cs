@@ -126,5 +126,12 @@ namespace PawnShop.Forms.Forms.BaseForms
                 label3.SetValid();
             }
         }
+
+        private void linkLabel2_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            UserForm userForm = new UserForm();
+            userForm.Show();
+            Visible = false;
+        }
     }
 }

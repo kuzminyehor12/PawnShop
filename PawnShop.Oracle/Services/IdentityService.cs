@@ -245,6 +245,47 @@ namespace PawnShop.Oracle.Services
             }
         }
 
+        public async Task<IEnumerable<User>> GetAllWithRolesAsync()
+        {
+            try
+            {
+                var users = new List<User>();
+                using (OracleConnection connection = new OracleConnection(ConnectionString))
+                {
+                    using (OracleCommand cmd = new OracleCommand())
+                    {
+                        await connection.OpenAsync();
+                        cmd.Connection = connection;
+                        cmd.CommandText = $"SELECT user_id, user_firstname, user_lastname, user_date_of_birth, user_mail, user_password, role_shortname FROM users " +
+                                        "INNER JOIN user_roles ON users.user_id = user_roles.users_user_id " +
+                                        "INNER JOIN roles ON user_roles.roles_role_id = roles.role_id ";
+                        OracleDataReader dataReader = await cmd.ExecuteReaderAsync() as OracleDataReader;
+                        while (dataReader.Read())
+                        {
+                            var user = new User
+                            {
+                                Id = Convert.ToDecimal(dataReader["user_id"]),
+                                FirstName = dataReader["user_firstname"].ToString(),
+                                LastName = dataReader["user_lastname"].ToString(),
+                                Email = dataReader["user_mail"].ToString(),
+                                DateOfBirth = dataReader["user_date_of_birth"].ToString(),
+                                Password = dataReader["user_password"].ToString(),
+                                Role = dataReader["role_shortname"].ToString()
+                            };
+
+                            users.Add(user);
+                        }
+                    }
+                }
+
+                return users;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
         public async Task<IEnumerable<Role>> GetRolesAsync()
         {
             try
